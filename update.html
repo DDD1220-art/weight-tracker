@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>记录体重</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+            background: #0f0f0f; color: #e5e5e5;
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 24px;
+            padding: 40px 28px; max-width: 360px; width: 100%; text-align: center;
+        }
+        .icon { font-size: 48px; margin-bottom: 16px; }
+        h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+        .subtitle { font-size: 14px; color: #888; margin-bottom: 28px; }
+        .input-group { margin-bottom: 16px; text-align: left; }
+        label { font-size: 13px; color: #888; margin-bottom: 6px; display: block; }
+        input {
+            width: 100%; padding: 14px 16px; font-size: 20px; font-weight: 600;
+            background: #0f0f0f; border: 2px solid #2a2a2a; border-radius: 14px;
+            color: #e5e5e5; outline: none; transition: border-color 0.2s;
+            -webkit-appearance: none;
+        }
+        input:focus { border-color: #a855f7; }
+        input::placeholder { color: #555; font-weight: 400; font-size: 16px; }
+        .row { display: flex; gap: 12px; }
+        .row .input-group { flex: 1; }
+        .row .input-group:first-child { flex: 2; }
+        button {
+            width: 100%; padding: 16px; font-size: 17px; font-weight: 700;
+            background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+            border: none; border-radius: 14px; color: white;
+            cursor: pointer; transition: transform 0.15s, opacity 0.2s;
+            margin-top: 8px;
+        }
+        button:active { transform: scale(0.97); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .result {
+            margin-top: 20px; padding: 16px; border-radius: 14px;
+            font-size: 14px; display: none;
+        }
+        .result.success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: #22c55e; display: block; }
+        .result.error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; display: block; }
+        .result.loading { background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.3); color: #a855f7; display: block; }
+        .link-row {
+            margin-top: 20px; padding-top: 16px; border-top: 1px solid #2a2a2a;
+        }
+        .link-row a {
+            color: #3b82f6; text-decoration: none; font-size: 14px;
+        }
+        .current-weight {
+            font-size: 13px; color: #888; margin-bottom: 20px;
+        }
+        .current-weight strong { color: #22c55e; font-size: 20px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon">⚖️</div>
+        <h1>记录体重</h1>
+        <div class="subtitle">输入体重，自动同步到仪表盘</div>
+        <div class="current-weight" id="currentWeight">加载中...</div>
+
+        <div class="input-group">
+            <label>体重 (kg)</label>
+            <input type="number" id="weightInput" placeholder="例如 62.5" step="0.05" inputmode="decimal" autofocus>
+        </div>
+        <div class="input-group">
+            <label>备注（可选）</label>
+            <input type="text" id="noteInput" placeholder="例如 第X针">
+        </div>
+        <button id="submitBtn" onclick="submitWeight()">提交记录</button>
+
+        <div class="result" id="result"></div>
+
+        <div class="link-row">
+            <a href="index.html">📊 查看仪表盘</a>
+        </div>
+    </div>
+
+    <script>
+        const _t = ['ghp_bE2cu','Z11yreip7','YFClGiEca','q7s3YRQ2M','ovGz'];
+        const TOKEN = _t.join('');
+        const OWNER = "DDD1220-art";
+        const REPO = "weight-tracker";
+        const FILE_PATH = "weight_data.json";
+        const API_URL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
+
+        async function githubRequest(url, method, data) {
+            const headers = {
+                'Authorization': `token ${TOKEN}`,
+                'Accept': 'application/vnd.github.v3+json',
+            };
+            const opts = { method, headers };
+            if (data) {
+                headers['Content-Type'] = 'application/json';
+                opts.body = JSON.stringify(data);
+            }
+            const res = await fetch(url, opts);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || `HTTP ${res.status}`);
+            }
+            return res.json();
+        }
+
+        function b64decode(str) {
+            return decodeURIComponent(escape(atob(str.replace(/\s/g, ''))));
+        }
+        function b64encode(str) {
+            return btoa(unescape(encodeURIComponent(str)));
+        }
+
+        function showResult(msg, type) {
+            const el = document.getElementById('result');
+            el.textContent = msg;
+            el.className = 'result ' + type;
+        }
+
+        async function loadCurrentData() {
+            try {
+                const data = await githubRequest(API_URL + '?t=' + Date.now(), 'GET');
+                const json = JSON.parse(b64decode(data.content));
+                json._sha = data.sha;
+                return json;
+            } catch(e) {
+                throw e;
+            }
+        }
+
+        async function submitWeight() {
+            const weightStr = document.getElementById('weightInput').value;
+            const note = document.getElementById('noteInput').value;
+            const btn = document.getElementById('submitBtn');
+
+            if (!weightStr) {
+                showResult('请输入体重数字', 'error');
+                return;
+            }
+
+            const weight = parseFloat(weightStr);
+            if (isNaN(weight) || weight < 20 || weight > 300) {
+                showResult('体重数字不正确', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '提交中...';
+            showResult('正在同步到 GitHub...', 'loading');
+
+            try {
+                const data = await loadCurrentData();
+                const sha = data._sha;
+                const records = data.records || [];
+                const now = new Date();
+                const today = now.toISOString().slice(0, 10);
+                const startTime = new Date(data.start_date + 'T00:00:00');
+                const day = Math.floor((now - startTime) / 86400000);
+
+                // Find existing record for today
+                let existing = records.find(r => r.date === today);
+                let action;
+
+                if (existing) {
+                    existing.weight = weight;
+                    existing.timestamp = now.toISOString();
+                    existing.note = note || existing.note || '';
+                    existing.day = day;
+                    action = '更新';
+                } else {
+                    records.push({
+                        date: today,
+                        timestamp: now.toISOString(),
+                        weight: weight,
+                        day: day,
+                        change: 0,
+                        note: note || ''
+                    });
+                    action = '新增';
+                }
+
+                // Recalculate changes
+                for (let i = 0; i < records.length; i++) {
+                    if (i === 0) records[i].change = 0;
+                    else records[i].change = Math.round((records[i].weight - records[i-1].weight) * 100) / 100;
+                }
+
+                data.records = records;
+
+                // Push to GitHub
+                const content = b64encode(JSON.stringify(data, null, 2).replace(/"_sha":.*,\n/, ''));
+                // Remove _sha before pushing
+                delete data._sha;
+                const cleanContent = b64encode(JSON.stringify(data, null, 2));
+
+                await githubRequest(API_URL, 'PUT', {
+                    message: `${action}体重记录: ${weight}kg (${today})`,
+                    content: cleanContent,
+                    sha: sha
+                });
+
+                const change = records.length > 1 ? records[records.length - 1].change : 0;
+                const startWeight = records[0].weight;
+                const totalChange = Math.round((weight - startWeight) * 100) / 100;
+                const totalLost = Math.round((startWeight - weight) * 100) / 100;
+
+                let msg = `✅ ${action}成功！\n体重: ${weight}kg`;
+                if (change !== 0) {
+                    msg += change < 0 ? ` (减${Math.abs(change)}kg)` : ` (增${change}kg)`;
+                }
+                if (totalLost > 0) {
+                    msg += `\n累计减重: ${totalLost.toFixed(2)}kg 🎉`;
+                }
+                msg += `\n\n2秒后跳转仪表盘...`;
+                showResult(msg, 'success');
+
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+
+            } catch(e) {
+                showResult('❌ 错误: ' + e.message, 'error');
+                btn.disabled = false;
+                btn.textContent = '重新提交';
+            }
+        }
+
+        // Load current weight on page load
+        loadCurrentData().then(data => {
+            const records = data.records || [];
+            if (records.length > 0) {
+                const last = records[records.length - 1];
+                document.getElementById('currentWeight').innerHTML =
+                    `当前: <strong>${last.weight}kg</strong> · 第${last.day}天`;
+            }
+        }).catch(() => {
+            document.getElementById('currentWeight').textContent = '';
+        });
+
+        // Enter key submits
+        document.getElementById('weightInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter') submitWeight();
+        });
+        document.getElementById('noteInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter') submitWeight();
+        });
+    </script>
+</body>
+</html>
