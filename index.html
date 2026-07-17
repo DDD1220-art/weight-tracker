@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>减肥体重记录</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        :root {
+            --bg: #0f0f0f;
+            --card-bg: #1a1a1a;
+            --card-border: #2a2a2a;
+            --text: #e5e5e5;
+            --text-dim: #888;
+            --green: #22c55e;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --purple: #a855f7;
+            --orange: #f59e0b;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding-bottom: 40px;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            padding: 60px 20px 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(168,85,247,0.08) 0%, transparent 50%);
+            animation: pulse 6s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            position: relative;
+            background: linear-gradient(135deg, #fff 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header .subtitle { font-size: 14px; color: var(--text-dim); margin-top: 6px; position: relative; }
+        .header .motivation { margin-top: 12px; font-size: 15px; color: var(--green); position: relative; }
+        .header .refresh-indicator {
+            position: absolute; top: 12px; right: 16px;
+            font-size: 12px; color: var(--text-dim);
+            display: flex; align-items: center; gap: 4px;
+        }
+        .refresh-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--green);
+            animation: blink 2s ease-in-out infinite;
+        }
+        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .container { max-width: 600px; margin: 0 auto; padding: 0 16px; }
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            gap: 12px; margin-top: -20px; position: relative; z-index: 10;
+        }
+        .stat-card {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 16px; padding: 18px 16px; text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:active { transform: scale(0.96); }
+        .stat-card .label {
+            font-size: 12px; color: var(--text-dim); margin-bottom: 6px;
+            display: flex; align-items: center; justify-content: center; gap: 4px;
+        }
+        .stat-card .value { font-size: 26px; font-weight: 700; line-height: 1.1; }
+        .stat-card .unit { font-size: 14px; font-weight: 400; color: var(--text-dim); }
+        .stat-card.highlight .value { color: var(--green); }
+        .stat-card.warning .value { color: var(--orange); }
+        .stat-card.danger .value { color: var(--red); }
+        .stat-card.info .value { color: var(--blue); }
+        .stat-card.purple .value { color: var(--purple); }
+        .chart-section {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 16px; padding: 20px 16px; margin-top: 16px;
+        }
+        .chart-section h2 {
+            font-size: 16px; font-weight: 600; margin-bottom: 16px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .chart-wrap { position: relative; height: 220px; }
+        .chart-wrap.small { height: 180px; }
+        .progress-section {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 16px; padding: 20px 16px; margin-top: 16px;
+        }
+        .progress-bar {
+            height: 12px; background: #2a2a2a; border-radius: 6px;
+            overflow: hidden; margin-top: 12px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--red) 0%, var(--orange) 50%, var(--green) 100%);
+            border-radius: 6px; transition: width 0.8s ease;
+        }
+        .progress-labels {
+            display: flex; justify-content: space-between;
+            margin-top: 6px; font-size: 12px; color: var(--text-dim);
+        }
+        .table-section {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 16px; padding: 20px 16px; margin-top: 16px; overflow-x: auto;
+        }
+        .table-section h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th {
+            text-align: left; padding: 8px 6px; color: var(--text-dim);
+            font-weight: 500; border-bottom: 1px solid var(--card-border); white-space: nowrap;
+        }
+        td { padding: 10px 6px; border-bottom: 1px solid #1e1e1e; white-space: nowrap; }
+        tr:last-child td { border-bottom: none; }
+        .day-badge {
+            background: rgba(168,85,247,0.15); color: var(--purple);
+            padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600;
+        }
+        .weight-cell { font-weight: 700; font-size: 15px; }
+        .change-down { color: var(--green); font-weight: 600; }
+        .change-up { color: var(--red); font-weight: 600; }
+        .change-flat { color: var(--text-dim); }
+        .note-cell { color: var(--text-dim); max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
+        .empty-state {
+            text-align: center; padding: 60px 20px;
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 16px; margin-top: 16px;
+        }
+        .empty-icon { font-size: 48px; margin-bottom: 16px; }
+        .empty-state h2 { font-size: 20px; margin-bottom: 8px; }
+        .empty-state p { color: var(--text-dim); font-size: 14px; margin-bottom: 8px; }
+        .footer {
+            text-align: center; color: var(--text-dim); font-size: 12px;
+            margin-top: 24px; padding: 0 20px;
+        }
+        .footer code {
+            background: #2a2a2a; padding: 2px 8px; border-radius: 6px; color: var(--blue);
+        }
+        .loading {
+            display: flex; justify-content: center; align-items: center;
+            height: 200px; color: var(--text-dim); font-size: 16px;
+        }
+        @media (max-width: 380px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .stat-card { padding: 14px 10px; }
+            .stat-card .value { font-size: 22px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="refresh-indicator">
+            <div class="refresh-dot"></div>
+            <span id="lastUpdate">加载中...</span>
+        </div>
+        <h1>🏃 减肥体重记录</h1>
+        <div class="subtitle" id="subtitle">加载中...</div>
+        <div class="motivation" id="motivation">💪</div>
+    </div>
+    <div class="container">
+        <div id="content"><div class="loading">⏳ 正在加载数据...</div></div>
+        <div class="footer">
+            <p>记录方式：给 WorkBuddy 发送 <code>体重 XX.X</code> 即可自动记录</p>
+            <p style="margin-top:6px;" id="pageTime"></p>
+        </div>
+    </div>
+
+    <script>
+        let weightChart = null;
+        let changeChart = null;
+        const DATA_URL = 'weight_data.json';
+
+        Chart.defaults.color = '#888';
+        Chart.defaults.font.family = '-apple-system, PingFang SC, sans-serif';
+        Chart.defaults.font.size = 12;
+
+        async function fetchData() {
+            const ts = Date.now();
+            const res = await fetch(DATA_URL + '?t=' + ts, { cache: 'no-cache' });
+            if (!res.ok) throw new Error('Failed to fetch data');
+            return await res.json();
+        }
+
+        function renderDashboard(data) {
+            const records = data.records || [];
+            const content = document.getElementById('content');
+
+            if (records.length === 0) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <h2>还没有记录</h2>
+                        <p>开始记录你的第一次体重吧！</p>
+                    </div>`;
+                return;
+            }
+
+            const startWeight = records[0].weight;
+            const currentWeight = records[records.length - 1].weight;
+            const totalChange = Math.round((currentWeight - startWeight) * 100) / 100;
+            const totalLost = Math.round((startWeight - currentWeight) * 100) / 100;
+            const dayCount = records[records.length - 1].day;
+            const avgDaily = dayCount > 0 ? Math.round((totalChange / dayCount) * 1000) / 1000 : 0;
+            const goalWeight = data.goal_weight;
+            const height = data.height;
+            const bmi = height && currentWeight ? Math.round((currentWeight / Math.pow(height / 100, 2)) * 10) / 10 : null;
+
+            let goalProgress = 0;
+            if (goalWeight && startWeight !== goalWeight) {
+                goalProgress = Math.round(((startWeight - currentWeight) / (startWeight - goalWeight)) * 1000) / 10;
+                goalProgress = Math.max(0, Math.min(100, goalProgress));
+            }
+
+            let motivation = '';
+            if (totalLost > 0) {
+                motivation = `已累计减重 <strong>${totalLost.toFixed(1)}kg</strong>，继续加油！💪`;
+            } else if (totalLost < 0) {
+                motivation = `体重有所上升，不要灰心，明天继续！💪`;
+            } else {
+                motivation = '记录已开始，坚持下去就是胜利！💪';
+            }
+
+            document.getElementById('subtitle').textContent = data.start_date ? '开始于 ' + data.start_date : '等待第一次记录';
+            document.getElementById('motivation').innerHTML = motivation;
+
+            // Build stats cards
+            const totalChangeClass = totalChange < 0 ? 'highlight' : totalChange > 0 ? 'danger' : '';
+            const totalChangeEmoji = totalChange < 0 ? '📉' : totalChange > 0 ? '📈' : '⚖️';
+
+            let html = `
+                <div class="stats-grid">
+                    <div class="stat-card highlight">
+                        <div class="label">📏 当前体重</div>
+                        <div class="value">${currentWeight}<span class="unit">kg</span></div>
+                    </div>
+                    <div class="stat-card info">
+                        <div class="label">📅 减肥天数</div>
+                        <div class="value">${dayCount}<span class="unit">天</span></div>
+                    </div>
+                    <div class="stat-card ${totalChangeClass}">
+                        <div class="label">${totalChangeEmoji} 总变化</div>
+                        <div class="value">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}<span class="unit">kg</span></div>
+                    </div>
+                    <div class="stat-card purple">
+                        <div class="label">📊 日均变化</div>
+                        <div class="value">${avgDaily > 0 ? '+' : ''}${avgDaily.toFixed(2)}<span class="unit">kg/天</span></div>
+                    </div>
+                </div>`;
+
+            // Chart section
+            const dates = records.map(r => r.date.substring(5));
+            const weights = records.map(r => r.weight);
+            const changes = records.map(r => r.change);
+            const changeDates = records.length > 1 ? records.slice(1).map(r => r.date.substring(5)) : [];
+            const changeValues = records.length > 1 ? records.slice(1).map(r => r.change) : [];
+            const changeColors = changeValues.map(c => c < 0 ? '#22c55e' : c > 0 ? '#ef4444' : '#6b7280');
+
+            html += `
+                <div class="chart-section">
+                    <h2>📈 体重趋势</h2>
+                    <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
+                </div>
+                <div class="chart-section">
+                    <h2>📊 每日变化</h2>
+                    <div class="chart-wrap small"><canvas id="changeChart"></canvas></div>
+                </div>`;
+
+            // Goal progress
+            if (goalWeight) {
+                const remaining = Math.max(0, Math.round((currentWeight - goalWeight) * 100) / 100);
+                html += `
+                    <div class="progress-section">
+                        <h2 style="font-size:16px;font-weight:600;">🎯 目标进度</h2>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:14px;color:var(--text-dim);">距目标还差 <strong style="color:var(--orange);font-size:18px;">${remaining}</strong> kg</span>
+                            <span style="font-size:20px;font-weight:700;color:var(--green);">${goalProgress}%</span>
+                        </div>
+                        <div class="progress-bar"><div class="progress-fill" style="width: ${goalProgress}%"></div></div>
+                        <div class="progress-labels">
+                            <span>起点 ${startWeight}kg</span>
+                            <span>目标 ${goalWeight}kg</span>
+                        </div>
+                    </div>`;
+            }
+
+            // BMI
+            if (bmi) {
+                const bmiCategory = bmi < 18.5 ? '偏瘦 🟢' : bmi < 24 ? '正常 🟢' : bmi < 28 ? '偏胖 🟡' : '肥胖 🔴';
+                const bmiColor = (18.5 <= bmi && bmi < 24) ? '#22c55e' : bmi < 28 ? '#f59e0b' : '#ef4444';
+                html += `
+                    <div class="chart-section" style="display:flex;align-items:center;justify-content:space-between;">
+                        <div>
+                            <h2 style="margin:0;">💪 BMI 指数</h2>
+                            <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">${bmiCategory}</div>
+                        </div>
+                        <div style="font-size:36px;font-weight:700;color:${bmiColor};">${bmi}</div>
+                    </div>`;
+            }
+
+            // History table
+            let tableRows = '';
+            for (let i = records.length - 1; i >= 0; i--) {
+                const r = records[i];
+                let changeHtml = '';
+                if (r.change < 0) changeHtml = `<span class="change-down">${r.change.toFixed(2)}kg</span>`;
+                else if (r.change > 0) changeHtml = `<span class="change-up">+${r.change.toFixed(2)}kg</span>`;
+                else changeHtml = '<span class="change-flat">--</span>';
+
+                const dayLabel = r.day === 0 ? '基准日' : `第${r.day}天`;
+                let timeStr = '';
+                if (r.timestamp) {
+                    try { timeStr = new Date(r.timestamp).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}); } catch(e) {}
+                }
+                const note = r.note || '';
+                tableRows += `
+                    <tr>
+                        <td>${r.date}</td>
+                        <td><span class="day-badge">${dayLabel}</span></td>
+                        <td>${timeStr}</td>
+                        <td class="weight-cell">${r.weight}kg</td>
+                        <td>${changeHtml}</td>
+                        <td class="note-cell">${note}</td>
+                    </tr>`;
+            }
+
+            html += `
+                <div class="table-section">
+                    <h2>📋 历史记录</h2>
+                    <table>
+                        <thead><tr><th>日期</th><th>天数</th><th>时间</th><th>体重</th><th>变化</th><th>备注</th></tr></thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                </div>`;
+
+            content.innerHTML = html;
+
+            // Render charts
+            renderWeightChart(dates, weights);
+            renderChangeChart(changeDates, changeValues, changeColors);
+        }
+
+        function renderWeightChart(dates, weights) {
+            const ctx = document.getElementById('weightChart');
+            if (!ctx) return;
+            if (weightChart) weightChart.destroy();
+
+            const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 220);
+            gradient.addColorStop(0, 'rgba(168, 85, 247, 0.3)');
+            gradient.addColorStop(1, 'rgba(168, 85, 247, 0)');
+
+            weightChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: '体重 (kg)',
+                        data: weights,
+                        borderColor: '#a855f7',
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#a855f7',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        pointHoverRadius: 8,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1a1a1a', titleColor: '#e5e5e5', bodyColor: '#a855f7',
+                            borderColor: '#2a2a2a', borderWidth: 1, padding: 12,
+                            callbacks: { label: ctx => '体重: ' + ctx.parsed.y + ' kg' }
+                        }
+                    },
+                    scales: {
+                        y: { grid: { color: '#1e1e1e' }, ticks: { callback: v => v + 'kg' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function renderChangeChart(dates, values, colors) {
+            const ctx = document.getElementById('changeChart');
+            if (!ctx) return;
+            if (changeChart) changeChart.destroy();
+
+            changeChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: '变化 (kg)',
+                        data: values,
+                        backgroundColor: colors,
+                        borderRadius: 6,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1a1a1a', titleColor: '#e5e5e5', bodyColor: '#fff',
+                            borderColor: '#2a2a2a', borderWidth: 1, padding: 12,
+                            callbacks: {
+                                label: ctx => {
+                                    const v = ctx.parsed.y;
+                                    if (v < 0) return '减重 ' + Math.abs(v).toFixed(2) + 'kg 📉';
+                                    if (v > 0) return '增重 ' + v.toFixed(2) + 'kg 📈';
+                                    return '无变化';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { grid: { color: '#1e1e1e' }, ticks: { callback: v => (v > 0 ? '+' : '') + v + 'kg' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        async function refresh() {
+            try {
+                const data = await fetchData();
+                renderDashboard(data);
+                const now = new Date();
+                document.getElementById('lastUpdate').textContent =
+                    '更新于 ' + now.toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+                document.getElementById('pageTime').textContent = '页面更新时间：' + now.toLocaleString('zh-CN');
+            } catch (e) {
+                document.getElementById('lastUpdate').textContent = '加载失败';
+                console.error(e);
+            }
+        }
+
+        // Initial load
+        refresh();
+        // Auto refresh every 10 seconds
+        setInterval(refresh, 10000);
+    </script>
+</body>
+</html>
