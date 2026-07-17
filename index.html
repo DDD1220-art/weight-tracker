@@ -154,6 +154,15 @@
         .footer code {
             background: #2a2a2a; padding: 2px 8px; border-radius: 6px; color: var(--blue);
         }
+        .record-btn {
+            display: block; width: 100%; max-width: 280px; margin: 20px auto 0;
+            padding: 14px; font-size: 16px; font-weight: 700;
+            background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+            border: none; border-radius: 14px; color: white;
+            text-align: center; text-decoration: none;
+            transition: transform 0.15s;
+        }
+        .record-btn:active { transform: scale(0.97); }
         .loading {
             display: flex; justify-content: center; align-items: center;
             height: 200px; color: var(--text-dim); font-size: 16px;
@@ -177,6 +186,7 @@
     </div>
     <div class="container">
         <div id="content"><div class="loading">⏳ 正在加载数据...</div></div>
+        <a href="update.html" class="record-btn">⚖️ 记录体重</a>
         <div class="footer">
             <p>记录方式：给 WorkBuddy 发送 <code>体重 XX.X</code> 即可自动记录</p>
             <p style="margin-top:6px;" id="pageTime"></p>
