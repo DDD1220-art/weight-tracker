@@ -86,6 +86,7 @@
         }
         .stat-card .value { font-size: 26px; font-weight: 700; line-height: 1.1; }
         .stat-card .unit { font-size: 14px; font-weight: 400; color: var(--text-dim); }
+        .stat-card .jin { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
         .stat-card.highlight .value { color: var(--green); }
         .stat-card.warning .value { color: var(--orange); }
         .stat-card.danger .value { color: var(--red); }
@@ -260,6 +261,7 @@
                     <div class="stat-card highlight">
                         <div class="label">📏 当前体重</div>
                         <div class="value">${currentWeight}<span class="unit">kg</span></div>
+                        <div class="jin">${(currentWeight * 2).toFixed(1)} 斤</div>
                     </div>
                     <div class="stat-card info">
                         <div class="label">📅 减肥天数</div>
@@ -268,6 +270,7 @@
                     <div class="stat-card ${totalChangeClass}">
                         <div class="label">${totalChangeEmoji} 总变化</div>
                         <div class="value">${totalChange > 0 ? '+' : ''}${totalChange.toFixed(2)}<span class="unit">kg</span></div>
+                        <div class="jin">${totalChange > 0 ? '+' : ''}${(totalChange * 2).toFixed(2)} 斤</div>
                     </div>
                     <div class="stat-card purple">
                         <div class="label">📊 日均变化</div>
